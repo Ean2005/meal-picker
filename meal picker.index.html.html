@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>今天吃什麼？AI 靈魂美食決策器 🍕</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter & Noto Sans TC -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#fff1f2',
+                            100: '#ffe4e6',
+                            500: '#f43f5e',
+                            600: '#e11d48',
+                            700: '#be123c',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans TC"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* 自訂動畫與特殊樣式 */
+        @keyframes pulse-subtle {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+        .animate-pulse-subtle {
+            animation: pulse-subtle 2s infinite ease-in-out;
+        }
+
+        /* 輪盤指標動畫 */
+        @keyframes pointer-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+        .pointer-anim {
+            animation: pointer-bounce 0.8s infinite ease-in-out;
+        }
+
+        /* 隱藏 Scrollbar 但保持可滾動 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Modal 漸入動畫 */
+        @keyframes modal-fade-in {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .modal-animate {
+            animation: modal-fade-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-amber-50 via-rose-50 to-orange-100 min-h-screen text-slate-800 font-sans pb-12">
+
+    <!-- 頂部 Header -->
+    <header class="w-full pt-8 pb-4 px-4 text-center">
+        <div class="inline-flex items-center gap-2 bg-white/80 backdrop-blur-md px-4 py-1.5 rounded-full shadow-sm text-xs font-semibold text-rose-600 mb-3 border border-rose-100">
+            <i class="fa-solid => fa-wand-magic-sparkles animate-spin" style="animation-duration: 3s;"></i> AI 靈魂美食選餐助手
+        </div>
+        <h1 class="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-rose-600 via-orange-500 to-amber-600 tracking-tight mb-2">
+            今天吃什麼？
+        </h1>
+        <p class="text-sm md:text-base text-slate-600 max-w-md mx-auto">
+            擺脫選擇困難症！讓轉盤拯救你的午餐與晚餐 🍔✨
+        </p>
+    </header>
+
+    <!-- 主要內容區塊 -->
+    <main class="max-w-4xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mt-2">
+        
+        <!-- 左側：決策轉盤區 (8 cols on lg) -->
+        <section class="lg:col-span-7 bg-white/90 backdrop-blur-md rounded-3xl p-6 shadow-xl border border-white/60 flex flex-col items-center relative overflow-hidden">
+            
+            <!-- 情境濾鏡標籤 (Mood/Vibe Filter) -->
+            <div class="w-full mb-6">
+                <div class="flex items-center justify-between mb-2 px-1">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">選擇當前心情 / 情境</span>
+                    <span id="poolCount" class="text-xs bg-rose-100 text-rose-600 font-semibold px-2 py-0.5 rounded-full">8 個選項</span>
+                </div>
+                <div id="filterContainer" class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    <!-- JS 動態生成 Filter Buttons -->
+                </div>
+            </div>
+
+            <!-- 轉盤主體容器 -->
+            <div class="relative my-4 flex items-center justify-center w-full max-w-[320px] aspect-square">
+                <!-- 指針 (Pointer) -->
+                <div class="absolute -top-3 z-20 pointer-anim filter drop-shadow-md">
+                    <div class="w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[28px] border-t-rose-600"></div>
+                </div>
+
+                <!-- Canvas 轉盤 -->
+                <canvas id="wheelCanvas" width="320" height="320" class="w-full h-full rounded-full drop-shadow-lg transition-transform duration-100 ease-out"></canvas>
+
+                <!-- 轉盤中心裝飾按鈕 -->
+                <button id="spinCenterBtn" onclick="spinWheel()" class="absolute z-10 w-20 h-20 bg-gradient-to-tr from-rose-500 to-orange-400 text-white font-extrabold rounded-full shadow-lg border-4 border-white hover:scale-105 active:scale-95 transition-all flex flex-col items-center justify-center text-center">
+                    <span class="text-sm leading-tight">GO!</span>
+                    <span class="text-[10px] opacity-80 font-normal">轉動</span>
+                </button>
+            </div>
+
+            <!-- 主抽籤按鈕 -->
+            <div class="w-full mt-6">
+                <button id="spinBtn" onclick="spinWheel()" class="w-full py-4 px-6 bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500 text-white font-bold text-lg rounded-2xl shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-dice text-xl"></i>
+                    <span>幫我決定今天的靈魂美食！</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- 右側：自訂口袋名單與設定 (5 cols on lg) -->
+        <section class="lg:col-span-5 bg-white/90 backdrop-blur-md rounded-3xl p-6 shadow-xl border border-white/60 flex flex-col gap-5">
+            
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-utensils text-rose-500"></i> 美食口袋名單
+                </h2>
+                <button onclick="resetDefaultItems()" class="text-xs text-slate-400 hover:text-rose-500 transition-colors flex items-center gap-1">
+                    <i class="fa-solid fa-rotate-left"></i> 重置預設
+                </button>
+            </div>
+
+            <!-- 新增選項表單 -->
+            <form id="addFoodForm" onsubmit="handleAddFood(event)" class="space-y-3">
+                <div class="flex gap-2">
+                    <!-- Emoji 選擇 -->
+                    <select id="foodEmoji" class="bg-slate-100 rounded-xl px-3 py-2 text-xl border-0 focus:ring-2 focus:ring-rose-400 cursor-pointer">
+                        <option value="🍱">🍱</option>
+                        <option value="🍜">🍜</option>
+                        <option value="🍕">🍕</option>
+                        <option value="🍔">🍔</option>
+                        <option value="🥗">🥗</option>
+                        <option value="🥟">🥟</option>
+                        <option value="🍲">🍲</option>
+                        <option value="🥩">🥩</option>
+                        <option value="🍣">🍣</option>
+                        <option value="🧋">🧋</option>
+                    </select>
+
+                    <!-- 美食名稱 -->
+                    <input type="text" id="foodName" placeholder="輸入美食或餐廳名稱..." required maxlength="12" class="flex-1 bg-slate-100 rounded-xl px-3 py-2 text-sm border-0 focus:ring-2 focus:ring-rose-400 outline-none">
+                </div>
+
+                <div class="flex gap-2">
+                    <!-- 分類選擇 -->
+                    <select id="foodCategory" class="flex-1 bg-slate-100 rounded-xl px-3 py-2 text-xs border-0 focus:ring-2 focus:ring-rose-400 text-slate-600 font-medium cursor-pointer">
+                        <option value="平價便當">🍱 平價便當</option>
+                        <option value="療癒高熱量">🍕 療癒高熱量</option>
+                        <option value="清爽健康">🥗 清爽健康</option>
+                        <option value="熱騰騰湯麵">🍜 熱騰騰湯麵</option>
+                    </select>
+
+                    <!-- 新增按鈕 -->
+                    <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> 新增
+                    </button>
+                </div>
+            </form>
+
+            <!-- 名單列表 -->
+            <div id="foodList" class="space-y-2 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+                <!-- JS 動態生成美食清單 -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 獲勝美食彈出 Modal (Popup Result Card) -->
+    <div id="resultModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-white/40 text-center relative modal-animate">
+            
+            <!-- 關閉按鈕 -->
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center transition-colors">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <!-- 美食大 Emoji -->
+            <div id="modalEmoji" class="text-7xl mb-2 animate-bounce">🍕</div>
+
+            <p class="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">AI 靈魂為你挑選了</p>
+            <h3 id="modalFoodName" class="text-3xl font-extrabold text-slate-800 mb-3">披薩</h3>
+
+            <!-- 幽默吃貨金句區 -->
+            <div class="bg-amber-50 border border-amber-200/60 rounded-2xl p-3.5 mb-6 text-amber-900 text-xs leading-relaxed italic relative">
+                <i class="fa-solid fa-quote-left text-amber-300 absolute -top-2 left-3 text-lg"></i>
+                <span id="modalQuote" class="relative z-10">「吃飽才有力氣減肥，今天就開心地大吃一頓吧！」</span>
+            </div>
+
+            <!-- 按鈕動作區 -->
+            <div class="space-y-2">
+                <!-- Google Maps 搜尋按鈕 -->
+                <a id="gmapsLink" href="#" target="_blank" class="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm">
+                    <i class="fa-solid fa-location-dot"></i> 搜尋附近的 <span id="gmapsFoodText">披薩</span>
+                </a>
+
+                <!-- 重抽按鈕 -->
+                <button onclick="closeModal(); spinWheel();" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-all text-xs">
+                    不滿意？再抽一次 🔄
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 邏輯 -->
+    <script>
+        // --- 預設資料庫 ---
+        const DEFAULT_FOODS = [
+            { id: '1', name: '雞腿便當', category: '平價便當', emoji: '🍱' },
+            { id: '2', name: '排骨飯', category: '平價便當', emoji: '🍱' },
+            { id: '3', name: '美式牛肉堡', category: '療癒高熱量', emoji: '🍔' },
+            { id: '4', name: '義式披薩', category: '療癒高熱量', emoji: '🍕' },
+            { id: '5', name: '韓式炸雞', category: '療癒高熱量', emoji: '🍗' },
+            { id: '6', name: '舒肥雞肉沙拉', category: '清爽健康', emoji: '🥗' },
+            { id: '7', name: '日式鮭魚定食', category: '清爽健康', emoji: '🍣' },
+            { id: '8', name: '牛肉麵', category: '熱騰騰湯麵', emoji: '🍜' },
+            { id: '9', name: '日式豚骨拉麵', category: '熱騰騰湯麵', emoji: '🍜' },
+            { id: '10', name: '麻辣鍋', category: '熱騰騰湯麵', emoji: '🍲' }
+        ];
+
+        // 類別標籤設定
+        const CATEGORIES = ['全部', '平價便當', '療癒高熱量', '清爽健康', '熱騰騰湯麵'];
+
+        // 幽默吃貨金句庫
+        const FOOD_QUOTES = [
+            "吃飽才有力氣減肥，今天辛苦了，值得吃頓好的！",
+            "人生苦短，肉要大塊！今天就聽靈魂的召喚吧。",
+            "沒有什麼是一頓美食解決不了的，如果不行，就吃兩頓！",
+            "今天熱量不扣分，心情加滿分！",
+            "胃的空間就像時間，擠一擠總會有的。",
+            "這個食物看起來很適合今天的你，開吃！",
+            "減肥是明天的事，今天的任務是享受生活。",
+            "生活雖然有苦，但食物永遠是甜的！"
+        ];
+
+        // 轉盤調色盤
+        const WHEEL_COLORS = [
+            '#f43f5e', '#fb923c', '#fbbf24', '#34d399', 
+            '#38bdf8', '#818cf8', '#c084fc', '#f472b6'
+        ];
+
+        // --- 狀態變數 ---
+        let foods = [];
+        let currentFilter = '全部';
+        let filteredFoods = [];
+        let isSpinning = false;
+        let currentAngle = 0; // 轉盤當前角度 (弧度)
+
+        // Web Audio API 聲音合成 (點擊聲/轉動聲)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTickSound() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.04);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.04);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        }
+
+        // --- 初始化 ---
+        window.onload = () => {
+            loadFoodsFromStorage();
+            renderFilterButtons();
+            updateFilteredPool();
+            initCanvas();
+        };
+
+        // 從 LocalStorage 載入資料
+        function loadFoodsFromStorage() {
+            const saved = localStorage.getItem('soul_food_list');
+            if (saved) {
+                try {
+                    foods = JSON.parse(saved);
+                } catch (e) {
+                    foods = [...DEFAULT_FOODS];
+                }
+            } else {
+                foods = [...DEFAULT_FOODS];
+            }
+        }
+
+        // 儲存至 LocalStorage
+        function saveFoodsToStorage() {
+            localStorage.setItem('soul_food_list', JSON.stringify(foods));
+        }
+
+        // 重置為預設名單
+        function resetDefaultItems() {
+            if (confirm('確定要將美食清單重置為預設項目嗎？')) {
+                foods = [...DEFAULT_FOODS];
+                saveFoodsToStorage();
+                updateFilteredPool();
+            }
+        }
+
+        // 更新篩選後的清單
+        function updateFilteredPool() {
+            if (currentFilter === '全部') {
+                filteredFoods = [...foods];
+            } else {
+                filteredFoods = foods.filter(item => item.category === currentFilter);
+            }
+
+            document.getElementById('poolCount').innerText = `${filteredFoods.length} 個選項`;
+            renderFoodList();
+            drawWheel();
+        }
+
+        // 渲染情境標籤按鈕
+        function renderFilterButtons() {
+            const container = document.getElementById('filterContainer');
+            container.innerHTML = CATEGORIES.map(cat => {
+                const isActive = cat === currentFilter;
+                const activeClass = isActive 
+                    ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20 font-bold' 
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium';
+                return `<button onclick="setFilter('${cat}')" class="px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${activeClass}">${cat}</button>`;
+            }).join('');
+        }
+
+        // 切換標籤
+        function setFilter(category) {
+            if (isSpinning) return;
+            currentFilter = category;
+            renderFilterButtons();
+            updateFilteredPool();
+        }
+
+        // 渲染右側口袋名單列表
+        function renderFoodList() {
+            const listEl = document.getElementById('foodList');
+            if (foods.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-8 text-xs text-slate-400">尚無美食項目，請新增選項！</div>`;
+                return;
+            }
+
+            listEl.innerHTML = foods.map(food => {
+                const isFilteredIn = currentFilter === '全部' || food.category === currentFilter;
+                return `
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 ${isFilteredIn ? 'opacity-100' : 'opacity-40'} transition-all">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-lg">${food.emoji}</span>
+                            <div>
+                                <div class="text-xs font-bold text-slate-700">${food.name}</div>
+                                <div class="text-[10px] text-slate-400">${food.category}</div>
+                            </div>
+                        </div>
+                        <button onclick="deleteFood('${food.id}')" class="text-slate-300 hover:text-rose-500 p-1.5 transition-colors">
+                            <i class="fa-regular fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 新增美食項目 (CRUD - Create)
+        function handleAddFood(e) {
+            e.preventDefault();
+            const name = document.getElementById('foodName').value.trim();
+            const emoji = document.getElementById('foodEmoji').value;
+            const category = document.getElementById('foodCategory').value;
+
+            if (!name) return;
+
+            const newItem = {
+                id: Date.now().toString(),
+                name,
+                category,
+                emoji
+            };
+
+            foods.unshift(newItem);
+            saveFoodsToStorage();
+            document.getElementById('foodName').value = '';
+            updateFilteredPool();
+        }
+
+        // 刪除美食項目 (CRUD - Delete)
+        function deleteFood(id) {
+            if (isSpinning) return;
+            foods = foods.filter(item => item.id !== id);
+            saveFoodsToStorage();
+            updateFilteredPool();
+        }
+
+        // --- Canvas 轉盤繪製與動畫 ---
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function initCanvas() {
+            drawWheel();
+        }
+
+        // 繪製轉盤
+        function drawWheel() {
+            const numSegments = filteredFoods.length;
+            const width = canvas.width;
+            const height = canvas.height;
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = width / 2 - 8;
+
+            ctx.clearRect(0, 0, width, height);
+
+            if (numSegments === 0) {
+                // 空轉盤提示
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#f1f5f9';
+                ctx.fill();
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '14px "Noto Sans TC"';
+                ctx.textAlign = 'center';
+                ctx.fillText('請新增此分類的美食', centerX, centerY);
+                return;
+            }
+
+            const arcSize = (Math.PI * 2) / numSegments;
+
+            for (let i = 0; i < numSegments; i++) {
+                const angle = currentAngle + i * arcSize;
+
+                // 畫扇形
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, angle, angle + arcSize);
+                ctx.fillStyle = WHEEL_COLORS[i % WHEEL_COLORS.length];
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // 畫文字與 Emoji
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(angle + arcSize / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 13px "Noto Sans TC"';
+
+                // 繪製文字與圖示
+                const food = filteredFoods[i];
+                const text = food.name.length > 5 ? food.name.substring(0, 4) + '..' : food.name;
+                ctx.fillText(`${food.emoji} ${text}`, radius - 20, 5);
+                ctx.restore();
+            }
+        }
+
+        // 啟動轉盤抽籤
+        function spinWheel() {
+            if (isSpinning) return;
+            if (filteredFoods.length === 0) {
+                alert('當前分類沒有美食項目可供抽籤，請先新增或切換分類！');
+                return;
+            }
+
+            isSpinning = true;
+            document.getElementById('spinBtn').disabled = true;
+            document.getElementById('spinCenterBtn').disabled = true;
+
+            // 隨機選擇結果索引
+            const winningIndex = Math.floor(Math.random() * filteredFoods.length);
+            const numSegments = filteredFoods.length;
+            const arcSize = (Math.PI * 2) / numSegments;
+
+            // 計算目標角度 (指針在正上方 270度 / -PI/2)
+            // 扇形中央對準正上方
+            const targetSegmentAngle = 2.5 * Math.PI - (winningIndex + 0.5) * arcSize;
+            
+            // 加上多圈旋轉 (5 ~ 8 圈)
+            const extraRounds = (Math.floor(Math.random() * 3) + 5) * Math.PI * 2;
+            const startAngle = currentAngle % (Math.PI * 2);
+            const totalRotation = extraRounds + (targetSegmentAngle - startAngle);
+
+            const duration = 4000; // 4 秒
+            const startTime = performance.now();
+            let lastSoundSegment = -1;
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Ease Out Cubic 減速效果
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                currentAngle = startAngle + totalRotation * easeOut;
+
+                drawWheel();
+
+                // 播放音效 (每經過一個扇形發出 Sound)
+                const currentSegment = Math.floor((currentAngle % (Math.PI * 2)) / arcSize);
+                if (currentSegment !== lastSoundSegment) {
+                    playTickSound();
+                    lastSoundSegment = currentSegment;
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    // 動畫結束
+                    isSpinning = false;
+                    document.getElementById('spinBtn').disabled = false;
+                    document.getElementById('spinCenterBtn').disabled = false;
+                    showResult(filteredFoods[winningIndex]);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // 展示結果 Modal 與粒子特效
+        function showResult(winningFood) {
+            // 五彩紙屑慶祝特效
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+
+            // 更新 Modal 內容
+            document.getElementById('modalEmoji').innerText = winningFood.emoji;
+            document.getElementById('modalFoodName').innerText = winningFood.name;
+
+            // 隨機選擇金句
+            const randomQuote = FOOD_QUOTES[Math.floor(Math.random() * FOOD_QUOTES.length)];
+            document.getElementById('modalQuote').innerText = `「${randomQuote}」`;
+
+            // 設定 Google Maps 連結
+            const gmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent('附近 ' + winningFood.name)}`;
+            document.getElementById('gmapsLink').href = gmapsUrl;
+            document.getElementById('gmapsFoodText').innerText = winningFood.name;
+
+            // 顯示 Modal
+            document.getElementById('resultModal').classList.remove('hidden');
+        }
+
+        // 關閉 Modal
+        function closeModal() {
+            document.getElementById('resultModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
